@@ -16,7 +16,7 @@ import tensorflow as tf
 from keras.layers import Dense
 import datetime
 import hashlib
-from PyPDF2 import PdfReader
+import PyPDF2
 
 # -------------------------------------------------------------------------------------------
 # Downloads
@@ -28,12 +28,22 @@ output_dir = "outputs"
 input_dir_prediction = "prediction"
 # Create output directory if not exists
 os.makedirs(output_dir, exist_ok=True)
+files = [filename for filename in os.listdir(input_dir_prediction) if filename.endswith('.pdf')]
 
 output_html = ""
 
 output_html += "<h3>Arquivos encontrados no diretório:</h3>"
 
 slot_number = 1
+
+# -------------------------------------------------------------------------------------------
+# Labels
+
+#Others
+label_1 = "[O]"
+
+#B-ReqTreatment
+label_2 = "[B-ReqTreatment]"
 
 # -------------------------------------------------------------------------------------------
 # Functions
@@ -50,24 +60,30 @@ def tokenize_sentence(sentence):
 
 # -------------------------------------------------------------------------------------------
 # Loop through files in input directory
-for file in os.listdir(input_dir_prediction):
-    if file.endswith(".pdf"):
-        pdf_file = os.path.join(input_dir_prediction, file)
-        pdf_reader = PdfReader(pdf_file)
+for filename in files:
+    print(filename)
+    if filename.endswith('.pdf'):
 
-        # Extrair texto do PDF
-        pdf_text = ""
-        for page in pdf_reader.pages:
-            pdf_text += page.extract_text()
+        # Open the PDF file in binary mode
+        with open(os.path.join(input_dir_prediction, filename), 'rb') as f:
+            # Read the PDF content
+            pdf_reader = PyPDF2.PdfFileReader(f)
 
-        # Tokenizar o texto
-        sentences_prediction = sent_tokenize(pdf_text)
-        sent_tokens = [word_tokenize(sentence_token) for sentence_token in sentences_prediction]
+            # Iterate through PDF file pages and extract text
+            text = ""
+            for page_num in range(pdf_reader.getNumPages()):
+                page = pdf_reader.getPage(page_num)
+                text += page.extractText()
 
-        # Exibir tokens
-        print(f"Tokens do arquivo {file}:")
-        for i, sentence_tokens in enumerate(sent_tokens, start=1):
-            print(f"Sentença {i}: {sentence_tokens}")
+            # Tokenize the content into sentences
+            sentences_prediction = sent_tokenize(text)
+
+            # Iterate through the sentences and tokenize the words
+            for sentence_prediction in sentences_prediction:
+                words_prediction = word_tokenize(sentence_prediction.lower(), language='portuguese')
+
+                # Put the filtered words back together into sentences
+                filtered_sentence_prediction = ' '.join(words_prediction)
 
 # -------------------------------------------------------------------------------------------
 # Loop through files in input directory
@@ -184,8 +200,12 @@ for file in os.listdir(input_dir):
                         lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
 
                         # Print LSTM model results
+                        lstm_results_prediction = []
                         output_html += "<p>Bidirectional LSTM Model Results:</p>"
                         lstm_results = lstm_model.predict(X)
+
+                        lstm_results_prediction.append((filtered_sentence_prediction, lstm_results[0]))
+
                         output_html += "<pre>"
                         # Get the indices of the words in the Slot de Tokens
                         word_indices = [tokenized_sent.wv.key_to_index[word.lower()] for word in context_words]
@@ -199,18 +219,17 @@ for file in os.listdir(input_dir):
                                 result = results_dict.get(word_index, 0.0)
                             output_html += f"<p>{word}: {result}"
                             if word != annotated_word:
-                                output_html += " - [O]"
+                                output_html += f" - {label_1}"
                             if word == annotated_word:
-                                output_html += " - [B-ReqTreatment]"
+                                output_html += f" - {label_2}"
                             output_html += "</p>"
 
-                            # Map the predicted value to labels
-                            if result < 0.5:  # Defina um limiar adequado para o seu caso
-                                label = "O"
-                            else:
-                                label = "B-ReqTreatment"
-
-                            output_html += f"<p>{word}: {label}</p>"
+                        # Map the predicted value to labels
+                        for sentence, result in lstm_results_prediction:
+                            label = label_1 if result[0] < 0.5 else label_2
+                            output_html += f"<p>Prediction" \
+                                           f":" \
+                                           f"{sentence}: {result[0]} - {label}</p>"
 
                         output_html += "</pre>"
 
