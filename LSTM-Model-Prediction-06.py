@@ -111,22 +111,19 @@ for filename in files:
                         sentences=[tokenized_stopwords], min_count=1, workers=2, sg=1, window=5)
                     if word in word2vec_model.wv:
                         word_embedding = word2vec_model.wv[word]
-                        single_value_embedding = np.mean(word_embedding)
-                        word_dict['embedding'] = single_value_embedding
-                        word_embeddings.append(word_dict)
                     else:
                         word_embedding = np.zeros(word2vec_model.vector_size)  # Default embedding if not found
 
-                    # word_dict = {
-                    #     'word': word,
-                    #     'word_index': word_index,
-                    #     'embedding': word_embedding,
-                    #     'sentence': sentence_prediction
-                    # }
-                    # word_embeddings.append(word_dict)
+                    word_dict = {
+                        'word': word,
+                        'word_index': word_index,
+                        'embedding': word_embedding,
+                        'sentence': sentence_prediction
+                    }
+                    word_embeddings.append(word_dict)
 
                 output_html += "<pre>"
-                output_html += f"<p>Dict: {word_embeddings}"
+                output_html += f"<p>Dict: {word_dict}"
                 output_html += "</pre>"
 
                 if word_embeddings:
@@ -249,12 +246,8 @@ for file in os.listdir(input_dir):
 
                         # Print LSTM model results
                         # Calculate the min and max values of sentence_embedding
-                        # Calculate the min and max values of sentence_embeddings_list
-                        min_value = np.min([np.min(emb) for emb in sentence_embedding])
-                        max_value = np.max([np.max(emb) for emb in sentence_embedding])
-
-                        # min_value = sentence_embedding.min(0)
-                        # max_value = sentence_embedding.max(1)
+                        min_value = sentence_embedding.min(0)
+                        max_value = sentence_embedding.max(1)
 
                         # Normalize sentence_embedding using min-max normalization
                         normalized_sentence_embedding = (sentence_embedding - min_value) / (
@@ -289,7 +282,7 @@ for file in os.listdir(input_dir):
                                 results_dict = dict(zip(word_indices, lstm_result))
                                 predict_x = 0.5
 
-                                for word, word_index in zip(sentence_embedding, word_indices):
+                                for word, word_index in zip(filtered_words, word_indices):
                                     result = results_dict.get(word_index, 0.0)  # Default to 0.0 if word index not found
                                     if word == annotated_word:
                                         result = results_dict.get(word_index, 1.0)
