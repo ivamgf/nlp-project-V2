@@ -117,6 +117,8 @@ for filename in files:
                     else:
                         word_embedding = np.zeros(word2vec_model.vector_size)  # Default embedding if not found
 
+                    # ===================================================================
+
                     # word_dict = {
                     #     'word': word,
                     #     'word_index': word_index,
@@ -144,6 +146,8 @@ for filename in files:
                 filtered_sentence_prediction = ' '.join(tokenized_stopwords)
 
                 filtered_sentence_prediction_list.append(tokenized_stopwords)
+
+                # ===================================================================================
 
 # -------------------------------------------------------------------------------------------
 # Loop through files in input directory
@@ -222,11 +226,31 @@ for file in os.listdir(input_dir):
                         y = tf.random.uniform((num_samples, num_classes))
 
                         # Create Bidirectional LSTM model
+
+                        # Input layer
                         lstm_model = tf.keras.Sequential()
                         lstm_model.add(Dense(units=32))
+
+                        # First hidden layer
                         lstm_model.add(
                             tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
-                                hidden_size, input_shape=(1, 120), dropout=0.1)))
+                                hidden_size, input_shape=(1, 120), dropout=0.1,
+                                return_sequences=True)))
+
+                        # Second hidden layer
+                        lstm_model.add(
+                            tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
+                                hidden_size, dropout=0.1, return_sequences=True)))
+
+                        # Third hidden layer
+                        lstm_model.add(
+                            tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
+                                hidden_size, dropout=0.1, return_sequences=True)))
+
+                        # Fourth hidden layer
+                        lstm_model.add(
+                            tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
+                                hidden_size, dropout=0.1)))
                         lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
 
                         # Learning rate
@@ -249,25 +273,27 @@ for file in os.listdir(input_dir):
 
                         # Print LSTM model results
                         # Calculate the min and max values of sentence_embedding
-                        # Calculate the min and max values of sentence_embeddings_list
-                        min_value = np.min([np.min(emb) for emb in sentence_embedding])
-                        max_value = np.max([np.max(emb) for emb in sentence_embedding])
-
-                        # min_value = sentence_embedding.min(0)
-                        # max_value = sentence_embedding.max(1)
+                        min_value = sentence_embedding.min()
+                        max_value = sentence_embedding.max()
 
                         # Normalize sentence_embedding using min-max normalization
                         normalized_sentence_embedding = (sentence_embedding - min_value) / (
                                     max_value - min_value + 1e-8)  # Adding small constant to avoid division by zero
 
+                        print("Normalized")
+                        print(normalized_sentence_embedding)
+                        print("Sentences")
+                        print(sentence_embedding)
                         # Reshape the normalized_sentence_embedding
-                        Z = normalized_sentence_embedding.reshape((num_samples, 1, 100))
-                        # Z = sentence_embedding.reshape((num_samples, 1, 100))
+                        # Z = normalized_sentence_embedding.reshape((num_samples, 1, 100))
                         lstm_results_prediction = []
-                        lstm_results = lstm_model.predict(Z)
+                        lstm_results = lstm_model.predict(X)
 
                         output_html += "<pre>"
                         output_html += "<p>Bidirectional LSTM Model Results:</p>"
+
+                        # ======================================================================
+                        # Revisar
 
                         # Loop through lstm_results
                         for lstm_result in lstm_results:
@@ -291,17 +317,19 @@ for file in os.listdir(input_dir):
 
                                 for word, word_index in zip(sentence_embedding, word_indices):
                                     result = results_dict.get(word_index, 0.0)  # Default to 0.0 if word index not found
-                                    if word == annotated_word:
+                                    if np.any(word == annotated_word):  # Usando np.any() para verificar igualdade
                                         result = results_dict.get(word_index, 1.0)
                                     # output_html += f"<p>{word}"
 
-                                output_html += f"<p>{result}"
+                                    output_html += f"<p>{result}"
 
                                 # Assign labels based on the predict_x threshold
                                 if result <= predict_x:
                                     output_html += f" - {label_1}"
                                 else:
                                     output_html += f" - {label_2}"
+
+                        # ======================================================================
 
                                 output_html += "</p>"
                                 output_html += "<p>"

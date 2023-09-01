@@ -111,20 +111,13 @@ for filename in files:
                         sentences=[tokenized_stopwords], min_count=1, workers=2, sg=1, window=5)
                     if word in word2vec_model.wv:
                         word_embedding = word2vec_model.wv[word]
+                        single_value_embedding = np.mean(word_embedding)
+                        word_dict['embedding'] = single_value_embedding
+                        word_embeddings.append(word_dict)
                     else:
                         word_embedding = np.zeros(word2vec_model.vector_size)  # Default embedding if not found
 
-                    word_dict = {
-                        'word': word,
-                        'word_index': word_index,
-                        'embedding': word_embedding,
-                        'sentence': sentence_prediction
-                    }
-                    word_embeddings.append(word_dict)
-
-                output_html += "<pre>"
-                output_html += f"<p>Dict: {word_dict}"
-                output_html += "</pre>"
+                    # ===================================================================
 
                 if word_embeddings:
                     # sentence_embedding = np.array([word_dict['embedding'] for word_dict in word_embeddings])
@@ -135,12 +128,8 @@ for filename in files:
                     sentence_embedding = np.zeros(100)  # You can adjust the default value as needed
 
                 sentence_embedding = np.expand_dims(sentence_embedding, axis=0)
-                output_html += f"<p>Sentence Embeddings: {sentence_embedding}"
 
-                # Put the filtered words back together into sentences
-                filtered_sentence_prediction = ' '.join(tokenized_stopwords)
-
-                filtered_sentence_prediction_list.append(tokenized_stopwords)
+                # ===================================================================================
 
 # -------------------------------------------------------------------------------------------
 # Loop through files in input directory
@@ -200,14 +189,46 @@ for file in os.listdir(input_dir):
                         context_text = context_text.replace(annotated_word, f"[annotation]{annotated_word}[annotation]")
 
                         # --------------------------------------------------------------------
-                        # Word Embeddings
-                        for word in context_words:
-                            word_embedding = tokenized_sent.wv[word].reshape((100, 1))
-                            word_embeddings.append(word_embedding)
+                        # Create a list to hold dictionaries for each word
+                        word_dicts = []
+
+                        # Create a dictionary for each word
+                        for word_index, word in enumerate(context_words):
+                            word_dict_model = {
+                                'word': word,
+                                'word_index': word_index,
+                                'embedding': None,  # Placeholder for embedding
+                                'sentence': context_text
+                            }
+                            word_dicts.append(word_dict_model)
+                            # Create a list to hold word embeddings for this sentence
+
+                            # Word Embeddings
+                            word_embeddings_model = []
+                            for word_dict in word_dicts:
+                                word = word_dict['word']
+                                if word in context_words:
+                                    word_embedding = tokenized_sent.wv[word]
+                                    single_value_embedding = np.mean(word_embedding)
+                                    word_dict['embedding'] = single_value_embedding
+                                    word_embeddings_model.append(word_dict)
+                                else:
+                                    word_embeddings_model = np.zeros(
+                                        word2vec_model.vector_size)  # Default embedding if not found
+
+                            # Convert the list of dictionaries to a numpy array
+                            word_embeddings_model = np.array(
+                                [word_dict['embedding'] for word_dict in word_embeddings_model if
+                                 word_dict['embedding'] is not None])
+
+                        output_html += "<pre>"
+                        output_html += f"<p>Dict: {word_dict_model}"
+                        # output_html += f"<p>Dict: {word_embeddings_model}"
+                        output_html += "</pre>"
 
                         # --------------------------------------------------------------------
                         # Bidirectional LSTM model
-                        input_size = word_embedding.shape[-1]
+                        input_size = word_embeddings_model.shape[-1]
                         hidden_size = 64
                         num_classes = 20
                         sequence_length = 1
@@ -215,15 +236,35 @@ for file in os.listdir(input_dir):
                         # Generate example data
                         num_samples = 1
                         # Reshape the input data
-                        X = word_embedding.reshape((num_samples, 1, 100))
+                        X = word_embeddings_model.reshape((num_samples, 1, input_size))
                         y = tf.random.uniform((num_samples, num_classes))
 
                         # Create Bidirectional LSTM model
+
+                        # Input layer
                         lstm_model = tf.keras.Sequential()
                         lstm_model.add(Dense(units=32))
+
+                        # First hidden layer
                         lstm_model.add(
                             tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
-                                hidden_size, input_shape=(1, 120), dropout=0.1)))
+                                hidden_size, input_shape=(1, 120), dropout=0.1,
+                                return_sequences=True)))
+
+                        # # Second hidden layer
+                        # lstm_model.add(
+                        #     tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
+                        #         hidden_size, dropout=0.1, return_sequences=True)))
+                        #
+                        # # Third hidden layer
+                        # lstm_model.add(
+                        #     tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
+                        #         hidden_size, dropout=0.1, return_sequences=True)))
+
+                        # Fourth hidden layer
+                        lstm_model.add(
+                            tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
+                                hidden_size, dropout=0.1)))
                         lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
 
                         # Learning rate
@@ -245,63 +286,60 @@ for file in os.listdir(input_dir):
                         lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
 
                         # Print LSTM model results
-                        # Calculate the min and max values of sentence_embedding
-                        min_value = sentence_embedding.min(0)
-                        max_value = sentence_embedding.max(1)
-
-                        # Normalize sentence_embedding using min-max normalization
-                        normalized_sentence_embedding = (sentence_embedding - min_value) / (
-                                    max_value - min_value + 1e-8)  # Adding small constant to avoid division by zero
 
                         # Reshape the normalized_sentence_embedding
-                        Z = normalized_sentence_embedding.reshape((num_samples, 1, 100))
-                        # Z = sentence_embedding.reshape((num_samples, 1, 100))
+                        # Z = normalized_sentence_embedding.reshape((num_samples, 1, 100))
                         lstm_results_prediction = []
-                        lstm_results = lstm_model.predict(Z)
+                        lstm_results = lstm_model.predict(X)
 
                         output_html += "<pre>"
                         output_html += "<p>Bidirectional LSTM Model Results:</p>"
 
-                        # Loop through lstm_results
-                        for lstm_result in lstm_results:
-                            lstm_results_prediction.append(lstm_result)
+                        # ======================================================================
+                        # Revisar
 
-                            # Loop through filtered_sentence_prediction_list
-                            for filtered_words, lstm_result in zip(filtered_sentence_prediction_list,
-                                                                   lstm_results_prediction):
-                                word_indices = []
-                                for word in filtered_words:
-                                    word_lower = word.lower()
-                                    if word_lower in tokenized_sent.wv:
-                                        word_index = tokenized_sent.wv.key_to_index[word_lower]
-                                        word_indices.append(word_index)
-                                    else:
-                                        # Handle words not found in the vocabulary
-                                        word_indices.append(-1)  # Use -1 as a placeholder for missing words
+                        # # Loop through lstm_results
+                        # for lstm_result in lstm_results:
+                        #     lstm_results_prediction.append(lstm_result)
+                        #
+                        #     # Loop through filtered_sentence_prediction_list
+                        #     for filtered_words, lstm_result in zip(filtered_sentence_prediction_list,
+                        #                                            lstm_results_prediction):
+                        #         word_indices = []
+                        #         for word in filtered_words:
+                        #             word_lower = word.lower()
+                        #             if word_lower in tokenized_sent.wv:
+                        #                 word_index = tokenized_sent.wv.key_to_index[word_lower]
+                        #                 word_indices.append(word_index)
+                        #             else:
+                        #                 # Handle words not found in the vocabulary
+                        #                 word_indices.append(-1)  # Use -1 as a placeholder for missing words
+                        #
+                        #         results_dict = dict(zip(word_indices, lstm_result))
+                        #         predict_x = 0.5
+                        #
+                        #         for word, word_index in zip(sentence_embedding, word_indices):
+                        #             result = results_dict.get(word_index, 0.0)  # Default to 0.0 if word index not found
+                        #             if np.any(word == annotated_word):  # Usando np.any() para verificar igualdade
+                        #                 result = results_dict.get(word_index, 1.0)
+                        #             # output_html += f"<p>{word}"
+                        #
+                        #             output_html += f"<p>{result}"
+                        #
+                        #         # Assign labels based on the predict_x threshold
+                        #         if result <= predict_x:
+                        #             output_html += f" - {label_1}"
+                        #         else:
+                        #             output_html += f" - {label_2}"
 
-                                results_dict = dict(zip(word_indices, lstm_result))
-                                predict_x = 0.5
+                        # ======================================================================
 
-                                for word, word_index in zip(filtered_words, word_indices):
-                                    result = results_dict.get(word_index, 0.0)  # Default to 0.0 if word index not found
-                                    if word == annotated_word:
-                                        result = results_dict.get(word_index, 1.0)
-                                    # output_html += f"<p>{word}"
+                                # output_html += "</p>"
+                                # output_html += "<p>"
+                                # output_html +="-------------------------------------------------------"
+                                # output_html += "</p>"
 
-                                output_html += f"<p>{result}"
-
-                                # Assign labels based on the predict_x threshold
-                                if result <= predict_x:
-                                    output_html += f" - {label_1}"
-                                else:
-                                    output_html += f" - {label_2}"
-
-                                output_html += "</p>"
-                                output_html += "<p>"
-                                output_html +="-------------------------------------------------------"
-                                output_html += "</p>"
-
-                            output_html += "</pre>"
+                            # output_html += "</pre>"
 
                         slot_number += 1
 
