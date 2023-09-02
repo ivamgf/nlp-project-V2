@@ -114,6 +114,8 @@ for filename in files:
                     else:
                         word_embedding = np.zeros(word2vec_model.vector_size)  # Default embedding if not found
 
+                    # ===================================================================
+
                 # Convert the list of dictionaries to a numpy array
                 word_embeddings = np.array(
                     [word_dict['embedding'] for word_dict in word_embeddings if
@@ -228,31 +230,11 @@ for file in os.listdir(input_dir):
                         y = tf.random.uniform((num_samples, num_classes))
 
                         # Create Bidirectional LSTM model
-
-                        # Input layer
                         lstm_model = tf.keras.Sequential()
                         lstm_model.add(Dense(units=32))
-
-                        # First hidden layer
                         lstm_model.add(
                             tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
-                                hidden_size, input_shape=(1, 120), dropout=0.1,
-                                return_sequences=True)))
-
-                        # Second hidden layer
-                        lstm_model.add(
-                            tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
-                                hidden_size, dropout=0.1, return_sequences=True)))
-
-                        # Third hidden layer
-                        lstm_model.add(
-                            tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
-                                hidden_size, dropout=0.1, return_sequences=True)))
-
-                        # Fourth hidden layer
-                        lstm_model.add(
-                            tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
-                                hidden_size, dropout=0.1)))
+                                hidden_size, input_shape=(1, 120), dropout=0.1)))
                         lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
 
                         # Learning rate
@@ -268,25 +250,79 @@ for file in os.listdir(input_dir):
 
                         # Define patience and EarlyStopping
                         patience = 10
-                        early_stopping = tf.keras.callbacks.EarlyStopping(
-                            patience=patience, restore_best_weights=True, monitor='val_loss')
+                        early_stopping = tf.keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True)
+
                         # Train the model with EarlyStopping
                         lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
 
                         # Print LSTM model results
+
+                        # Reshape the normalized_sentence_embedding
+                        # Z = normalized_sentence_embedding.reshape((num_samples, 1, 100))
                         input_size_prediction = word_embeddings.shape[-1]
 
                         Z = word_embeddings.reshape((num_samples, 1, input_size_prediction))
-
-                        output_html += f"{X}"
-                        output_html += f"{Z}"
-
-                        # lstm_results_prediction = []
-                        # lstm_results = lstm_model.predict(Z)
+                        len_x = len(X)
+                        len_z = len(Z)
 
                         output_html += "<pre>"
-                        output_html += "<p>Bidirectional LSTM Model Results:</p>"
+                        output_html += "Dimensões:"
+                        output_html += f"X: {X} - {len_x}"
+                        output_html += f"Z: {Z} - {len_z}"
+                        output_html += "</pre>"
+
+                        # lstm_results_prediction = []
+                        lstm_results = lstm_model.predict(Z)
+
+                        # output_html += "<pre>"
+                        # output_html += "<p>Bidirectional LSTM Model Results:</p>"
                         # output_html += f"<p>{lstm_results}</p>"
+
+                        # ======================================================================
+                        # Revisar
+
+                        # # Loop through lstm_results
+                        # for lstm_result in lstm_results:
+                        #     lstm_results_prediction.append(lstm_result)
+                        #
+                        #     # Loop through filtered_sentence_prediction_list
+                        #     for filtered_words, lstm_result in zip(filtered_sentence_prediction_list,
+                        #                                            lstm_results_prediction):
+                        #         word_indices = []
+                        #         for word in filtered_words:
+                        #             word_lower = word.lower()
+                        #             if word_lower in tokenized_sent.wv:
+                        #                 word_index = tokenized_sent.wv.key_to_index[word_lower]
+                        #                 word_indices.append(word_index)
+                        #             else:
+                        #                 # Handle words not found in the vocabulary
+                        #                 word_indices.append(-1)  # Use -1 as a placeholder for missing words
+                        #
+                        #         results_dict = dict(zip(word_indices, lstm_result))
+                        #         predict_x = 0.5
+                        #
+                        #         for word, word_index in zip(sentence_embedding, word_indices):
+                        #             result = results_dict.get(word_index, 0.0)  # Default to 0.0 if word index not found
+                        #             if np.any(word == annotated_word):  # Usando np.any() para verificar igualdade
+                        #                 result = results_dict.get(word_index, 1.0)
+                        #             # output_html += f"<p>{word}"
+                        #
+                        #             output_html += f"<p>{result}"
+                        #
+                        #         # Assign labels based on the predict_x threshold
+                        #         if result <= predict_x:
+                        #             output_html += f" - {label_1}"
+                        #         else:
+                        #             output_html += f" - {label_2}"
+
+                        # ======================================================================
+
+                                # output_html += "</p>"
+                                # output_html += "<p>"
+                                # output_html +="-------------------------------------------------------"
+                                # output_html += "</p>"
+
+                            # output_html += "</pre>"
 
                         slot_number += 1
 
