@@ -1,0 +1,4 @@
+# Ignore Inputs, Outputs, Prediction folder
+/inputs
+/outputs
+/prediction
