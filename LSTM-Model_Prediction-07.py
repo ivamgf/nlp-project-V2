@@ -65,6 +65,7 @@ def tokenize_sentence(sentence):
 # -------------------------------------------------------------------------------------------
 # Create a list to hold dictionaries for each word
 word_dicts = []
+word_embeddings = []
 
 # Loop through files in input directory
 for filename in files:
@@ -87,7 +88,6 @@ for filename in files:
 
             # Iterate through the sentences and tokenize the words
             for sentence_prediction in sentences_prediction:
-                word_embeddings = []
                 words_prediction = word_tokenize(sentence_prediction, language='portuguese')
                 tokenized_stopwords = [word for word in words_prediction if
                                        word.lower() not in stopwords.words('portuguese')
@@ -116,10 +116,10 @@ for filename in files:
 
                     # ===================================================================
 
-                # Convert the list of dictionaries to a numpy array
-                word_embeddings = np.array(
-                    [word_dict['embedding'] for word_dict in word_embeddings if
-                     word_dict['embedding'] is not None])
+            # Convert the list of dictionaries to a numpy array
+            word_embeddings = np.array(
+                [word_dict['embedding'] for word_dict in word_embeddings if
+                 word_dict['embedding'] is not None])
 
 # -------------------------------------------------------------------------------------------
 # Loop through files in input directory
@@ -211,10 +211,6 @@ for file in os.listdir(input_dir):
                                 [word_dict['embedding'] for word_dict in word_embeddings_model if
                                  word_dict['embedding'] is not None])
 
-                        output_html += "<pre>"
-                        output_html += f"<p>Dict: {word_dict_model}"
-                        output_html += "</pre>"
-
                         # --------------------------------------------------------------------
                         # Bidirectional LSTM model
                         input_size = word_embeddings_model.shape[-1]
@@ -264,65 +260,34 @@ for file in os.listdir(input_dir):
                         Z = word_embeddings.reshape((num_samples, 1, input_size_prediction))
                         len_x = len(X)
                         len_z = len(Z)
+                        len_wem = len(word_embeddings_model)
+                        len_we = len(word_embeddings)
 
                         output_html += "<pre>"
+
+                        output_html += "<p>"
                         output_html += "Dimensões:"
-                        output_html += f"X: {X} - {len_x}"
-                        output_html += f"Z: {Z} - {len_z}"
+                        output_html += "</p>"
+                        output_html += "<p>"
+                        output_html += f"word_embeddings_model: {word_embeddings_model}"
+                        output_html += "</p>"
+                        output_html += "<p>"
+                        output_html += f"word_embeddings: {word_embeddings}"
+                        output_html += "</p>"
+                        output_html += "<p>"
+                        output_html += f"Dim wem: {len_wem}"
+                        output_html += "</p>"
+                        output_html += "<p>"
+                        output_html += f"Dim we: {len_we}"
+                        output_html += "</p>"
                         output_html += "</pre>"
 
                         # lstm_results_prediction = []
-                        lstm_results = lstm_model.predict(Z)
+                        # lstm_results = lstm_model.predict(Z)
 
                         # output_html += "<pre>"
                         # output_html += "<p>Bidirectional LSTM Model Results:</p>"
                         # output_html += f"<p>{lstm_results}</p>"
-
-                        # ======================================================================
-                        # Revisar
-
-                        # # Loop through lstm_results
-                        # for lstm_result in lstm_results:
-                        #     lstm_results_prediction.append(lstm_result)
-                        #
-                        #     # Loop through filtered_sentence_prediction_list
-                        #     for filtered_words, lstm_result in zip(filtered_sentence_prediction_list,
-                        #                                            lstm_results_prediction):
-                        #         word_indices = []
-                        #         for word in filtered_words:
-                        #             word_lower = word.lower()
-                        #             if word_lower in tokenized_sent.wv:
-                        #                 word_index = tokenized_sent.wv.key_to_index[word_lower]
-                        #                 word_indices.append(word_index)
-                        #             else:
-                        #                 # Handle words not found in the vocabulary
-                        #                 word_indices.append(-1)  # Use -1 as a placeholder for missing words
-                        #
-                        #         results_dict = dict(zip(word_indices, lstm_result))
-                        #         predict_x = 0.5
-                        #
-                        #         for word, word_index in zip(sentence_embedding, word_indices):
-                        #             result = results_dict.get(word_index, 0.0)  # Default to 0.0 if word index not found
-                        #             if np.any(word == annotated_word):  # Usando np.any() para verificar igualdade
-                        #                 result = results_dict.get(word_index, 1.0)
-                        #             # output_html += f"<p>{word}"
-                        #
-                        #             output_html += f"<p>{result}"
-                        #
-                        #         # Assign labels based on the predict_x threshold
-                        #         if result <= predict_x:
-                        #             output_html += f" - {label_1}"
-                        #         else:
-                        #             output_html += f" - {label_2}"
-
-                        # ======================================================================
-
-                                # output_html += "</p>"
-                                # output_html += "<p>"
-                                # output_html +="-------------------------------------------------------"
-                                # output_html += "</p>"
-
-                            # output_html += "</pre>"
 
                         slot_number += 1
 
