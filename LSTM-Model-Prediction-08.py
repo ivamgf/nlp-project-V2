@@ -1,4 +1,4 @@
-# Algorithm 1 - LSTM Model training
+# Algorithm 8 - LSTM Model training
 # Dataset cleaning, pre-processing XML and create slots and embeddings
 # RNN Bidirectional LSTM Layer
 # Results in file and browser
@@ -63,66 +63,8 @@ def tokenize_sentence(sentence):
     return model
 
 # -------------------------------------------------------------------------------------------
-# Create a list to hold dictionaries for each word
-word_dicts = []
-word_embeddings = []
-
 # Loop through files in input directory
-for filename in files:
-    # print(filename)
-    if filename.endswith('.pdf'):
 
-        # Open the PDF file in binary mode
-        with open(os.path.join(input_dir_prediction, filename), 'rb') as f:
-            # Read the PDF content
-            pdf_reader = PyPDF2.PdfFileReader(f)
-
-            # Iterate through PDF file pages and extract text
-            text = ""
-            for page_num in range(pdf_reader.getNumPages()):
-                page = pdf_reader.getPage(page_num)
-                text += page.extractText()
-
-            # Tokenize the content into sentences
-            sentences_prediction = sent_tokenize(text)
-
-            # Iterate through the sentences and tokenize the words
-            for sentence_prediction in sentences_prediction:
-                words_prediction = word_tokenize(sentence_prediction, language='portuguese')
-                tokenized_stopwords = [word for word in words_prediction if
-                                       word.lower() not in stopwords.words('portuguese')
-                                       and not any(char.isdigit() or char in string.punctuation for char in word)]
-
-                # Create a dictionary for each word
-                for word_index, word in enumerate(tokenized_stopwords):
-                    word_dict = {
-                        'word': word,
-                        'word_index': word_index,
-                        'embedding': None,  # Placeholder for embedding
-                        'sentence': sentence_prediction
-                    }
-                    # Create a list to hold word embeddings for this sentence
-
-                    # Initialize the Word2Vec model
-                    word2vec_model = gensim.models.Word2Vec(
-                        sentences=[tokenized_stopwords], min_count=1, workers=2, sg=1, window=5)
-                    if word in word2vec_model.wv:
-                        word_embedding = word2vec_model.wv[word]
-                        single_value_embedding = np.mean(word_embedding)
-                        word_dict['embedding'] = single_value_embedding
-                        word_embeddings.append(word_dict)
-                    else:
-                        word_embedding = np.zeros(word2vec_model.vector_size)  # Default embedding if not found
-
-                    # ===================================================================
-
-            # Convert the list of dictionaries to a numpy array
-            word_embeddings = np.array(
-                [word_dict['embedding'] for word_dict in word_embeddings if
-                 word_dict['embedding'] is not None])
-
-# -------------------------------------------------------------------------------------------
-# Loop through files in input directory
 for file in os.listdir(input_dir):
     if file.endswith(".xml"):
         xml_file = os.path.join(input_dir, file)
@@ -193,6 +135,10 @@ for file in os.listdir(input_dir):
                             word_dicts.append(word_dict_model)
                             # Create a list to hold word embeddings for this sentence
 
+                            # Initialize the Word2Vec model
+                            word2vec_model = gensim.models.Word2Vec(
+                                sentences=[context_words], min_count=1, workers=2, sg=1, window=5)
+
                             # Word Embeddings
                             word_embeddings_model = []
                             for word_dict in word_dicts:
@@ -252,71 +198,46 @@ for file in os.listdir(input_dir):
                         lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
 
                         # Print LSTM model results
+                        lstm_results_prediction = []
+                        lstm_results = lstm_model.predict(X)
 
-                        # Reshape the normalized_sentence_embedding
-                        # Z = normalized_sentence_embedding.reshape((num_samples, 1, 100))
-                        input_size_prediction = word_embeddings.shape[-1]
+                        # Create a list to store the predicted labels
+                        predicted_labels = []
 
-                        Z = word_embeddings.reshape((num_samples, 1, input_size_prediction))
-                        len_x_list = []
-                        len_x = len(X)
-                        len_z = len(Z)
-                        len_wem = len(word_embeddings_model)
-                        len_we = len(word_embeddings)
-                        len_x_list.append(len_wem)
+                        # Loop through lstm_results
+                        for lstm_result in lstm_results:
+                            lstm_results_prediction.append(lstm_result)
 
-                        output_html += "<pre>"
+                            # Loop through each word in word_dicts
+                            for word_dict in word_dicts:
+                                word = word_dict['word']
+                                word_index = word_dict['word_index']
+                                embedding = word_dict['embedding']
 
-                        output_html += "<p>"
-                        output_html += "Dimensões:"
-                        output_html += "</p>"
-                        output_html += "<p>"
-                        output_html += f"word_embeddings_model: {word_embeddings_model}"
-                        output_html += "</p>"
-                        output_html += "<p>"
-                        output_html += f"word_embeddings: {word_embeddings}"
-                        output_html += "</p>"
-                        output_html += "<p>"
-                        output_html += f"Dim wem: {len_wem}"
-                        output_html += "</p>"
-                        output_html += "<p>"
-                        output_html += f"Dim we: {len_we}"
-                        output_html += "</p>"
-                        output_html += "<p>"
-                        output_html += f"X: {X}"
-                        output_html += "</p>"
-                        output_html += "<p>"
-                        output_html += f"Y: {y}"
+                                # similarity threshold
+                                threshold = 0.7
 
-                        output_html += "</p>"
-                        output_html += "<p>"
-                        output_html += f"Z: {Z}"
-                        output_html += "</p>"
-                        output_html += "<p>"
-                        output_html += f"List X: {len_x_list}"
-                        output_html += "</p>"
-                        output_html += "</pre>"
+                                if np.any(word == annotated_word):
+                                    result = 1.0
+                                else:
+                                    result = lstm_result[word_dict['word_index'] - 1]
 
-                        for dim in len_x_list:
-                            parts_Z = np.array_split(Z, dim)
-                            lstm_results_prediction = []
+                                # Check if word is equal to annotated_word
+                                if result > threshold:
+                                    predicted_label = label_2
+                                else:
+                                    predicted_label = label_1
 
-                            for part_Z in parts_Z:
+                                # Add the predicted label to the predicted labels list
+                                predicted_labels.append(predicted_label)
+
                                 output_html += "<pre>"
-                                output_html += f"<p>Part Z:{part_Z}</p>"
-                                output_html += "</pre>"
-                                # Execute a operação do modelo LSTM para cada parte de Z (parte_Z)
-                                # lstm_results = lstm_model.predict(part_Z)
-                                # lstm_results_prediction.append(lstm_results)
-
-                        # lstm_results_prediction = []
-                        # lstm_results = lstm_model.predict(Z)
-
-                        # output_html += "<pre>"
-                        # output_html += "<p>Bidirectional LSTM Model Results:</p>"
-                        # output_html += f"<p>{lstm_results_prediction}</p>"
+                                output_html += "<p>Bidirectional LSTM Model Results:</p>"
+                                output_html += f"<p>{word} ({embedding}) : ({result}) - {predicted_label}</p>"
 
                         slot_number += 1
+
+
 
 # --------------------------------------------------------------------
 # Generate unique hash for the file titles
